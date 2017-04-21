@@ -11,6 +11,7 @@ from glob import glob
 from ops import *
 from utils import *
 from tensorflow.contrib.metrics import streaming_precision_at_thresholds
+import socket
 
 def conv_out_size_same(size, stride):
   return int(math.ceil(float(size) / float(stride)))
@@ -18,7 +19,7 @@ def conv_out_size_same(size, stride):
 class DCGAN(object):
   def __init__(self, sess, input_height=108, input_width=108, is_crop=True,
          batch_size=64, sample_num = 64, output_height=64, output_width=64,
-         y_dim=None, z_dim=100, gf_dim=64, df_dim=64,
+         y_dim=None, z_dim=100, gf_dim=64, df_dim=64, version='fm1.0',
          gfc_dim=1024, dfc_dim=1024, c_dim=3, dataset_name='default',
          input_fname_pattern='*.jpg', checkpoint_dir=None, exp_name='basic', sample_dir=None):
     """
@@ -73,6 +74,8 @@ class DCGAN(object):
     self.input_fname_pattern = input_fname_pattern
     self.checkpoint_dir = checkpoint_dir
     self.exp_name = exp_name
+    self.version = version
+
     self.build_model()
 
   def build_model(self):
@@ -136,7 +139,7 @@ class DCGAN(object):
     self.d_loss = self.d_loss_real + self.d_loss_fake\
         + self.category_loss_real
 
-    if self.exp_name == 'feature_matching':
+    if self.version == 'fm1.0':
       self.g_loss = self.feature_matching_loss + self.category_loss_fake
     else:
       self.g_loss = self.g_loss_gan + self.category_loss_fake
@@ -156,9 +159,8 @@ class DCGAN(object):
     if config.dataset == 'mnist':
       data_X, data_y = self.load_mnist()
     elif config.dataset == 'nuswide':
-      label_dict = load_label_dict('train')
-      data_X = glob(os.path.join("/mnt/hermes/nguyenpx/nuswide/train", self.input_fname_pattern))
-      #data_X = glob(os.path.join("./data", config.dataset, self.input_fname_pattern))
+      label_dict = load_label_dict(config.data_dir, 'train')
+      data_X = glob(os.path.join(config.data_dir, "train", self.input_fname_pattern))
       data_y = load_labels(label_dict, data_X, 14)
     else:
       data = glob(os.path.join("./data", config.dataset, self.input_fname_pattern))
@@ -329,8 +331,8 @@ class DCGAN(object):
 
   def eval(self, config):
     """Eval DCGAN"""
-    label_dict = load_label_dict('eval')
-    data_X = glob(os.path.join("/mnt/hermes/nguyenpx/nuswide/eval", self.input_fname_pattern))
+    label_dict = load_label_dict(config.data_dir, 'eval')
+    data_X = glob(os.path.join(config.data_dir, "eval", self.input_fname_pattern))
     data_y = load_labels(label_dict, data_X, 14)
 
     self.writer = SummaryWriter(os.path.join("./logs",
@@ -463,43 +465,6 @@ class DCGAN(object):
         h4 = deconv2d(h3, [self.batch_size, s_h, s_w, self.c_dim], name='g_h4')
 
         return tf.nn.tanh(h4)
-
-  def load_mnist(self):
-    data_dir = os.path.join("./data", self.dataset_name)
-    
-    fd = open(os.path.join(data_dir,'train-images-idx3-ubyte'))
-    loaded = np.fromfile(file=fd,dtype=np.uint8)
-    trX = loaded[16:].reshape((60000,28,28,1)).astype(np.float)
-
-    fd = open(os.path.join(data_dir,'train-labels-idx1-ubyte'))
-    loaded = np.fromfile(file=fd,dtype=np.uint8)
-    trY = loaded[8:].reshape((60000)).astype(np.float)
-
-    fd = open(os.path.join(data_dir,'t10k-images-idx3-ubyte'))
-    loaded = np.fromfile(file=fd,dtype=np.uint8)
-    teX = loaded[16:].reshape((10000,28,28,1)).astype(np.float)
-
-    fd = open(os.path.join(data_dir,'t10k-labels-idx1-ubyte'))
-    loaded = np.fromfile(file=fd,dtype=np.uint8)
-    teY = loaded[8:].reshape((10000)).astype(np.float)
-
-    trY = np.asarray(trY)
-    teY = np.asarray(teY)
-    
-    X = np.concatenate((trX, teX), axis=0)
-    y = np.concatenate((trY, teY), axis=0).astype(np.int)
-    
-    seed = 547
-    np.random.seed(seed)
-    np.random.shuffle(X)
-    np.random.seed(seed)
-    np.random.shuffle(y)
-
-    y_vec = np.zeros((len(y), self.y_dim), dtype=np.float)
-    for i, label in enumerate(y):
-      y_vec[i,y[i]] = 1.0
-
-    return X/255.,y_vec
 
   @property
   def model_dir(self):

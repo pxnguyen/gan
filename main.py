@@ -4,6 +4,7 @@ import numpy as np
 
 from model import DCGAN
 from utils import pp, visualize, to_json, show_all_variables
+import socket
 
 import tensorflow as tf
 
@@ -23,6 +24,8 @@ flags.DEFINE_string("input_fname_pattern", "*.jpg", "Glob pattern of filename of
 flags.DEFINE_string("checkpoint_dir", "checkpoint", "Directory name to save the checkpoints [checkpoint]")
 flags.DEFINE_string("sample_dir", "samples", "Directory name to save the image samples [samples]")
 flags.DEFINE_string("exp_name", 'basic', "Experiment name [basic]")
+flags.DEFINE_string("version", 'fm1.0', "Software version")
+flags.DEFINE_string("data_dir", '/mnt/hermes/nguyenpx/nuswide', "Path to the data directories")
 flags.DEFINE_boolean("is_train", False, "True for training, False for testing [False]")
 flags.DEFINE_boolean("is_crop", False, "True for training, False for testing [False]")
 flags.DEFINE_boolean("visualize", False, "True for visualizing, False for nothing [False]")
@@ -66,7 +69,8 @@ def main(_):
           input_fname_pattern=FLAGS.input_fname_pattern,
           is_crop=FLAGS.is_crop,
           checkpoint_dir=FLAGS.checkpoint_dir,
-          sample_dir=FLAGS.sample_dir)
+          sample_dir=FLAGS.sample_dir,
+	  version=FLAGS.version)
 
     show_all_variables()
     if FLAGS.is_train:

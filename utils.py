@@ -42,8 +42,8 @@ def load_labels(labels_dict, filenames, label_set_size):
             embedding[index][l] = 1
     return embedding
 
-def load_label_dict(mode):
-    file_path = '/mnt/hermes/nguyenpx/nuswide/%s/labels.txt' % mode
+def load_label_dict(data_dir, mode):
+    file_path = os.path.join(data_dir, '%s/labels.txt' % mode)
     label_dict = {}
     with open(file_path) as fid:
         lines = fid.read().split('\n')
