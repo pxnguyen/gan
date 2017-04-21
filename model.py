@@ -99,14 +99,16 @@ class DCGAN(object):
     self.z_sum = histogram_summary("z", self.z)
     self.G = self.generator(self.z, self.y)
     self.D, self.D_logits, self.real_cat_logits, self.h3_real = self.discriminator(inputs, self.y, reuse=False)
+    self.h3_real = tf.reduce_mean(self.h3_real, axis=0)
 
     self.sampler = self.sampler(self.z, self.y)
     self.D_, self.D_logits_, self.fake_cat_logits, self.h3_fake = self.discriminator(self.G, self.y, reuse=True)
+    self.h3_fake = tf.reduce_mean(self.h3_fake, axis=0)
 
     self.d_sum = histogram_summary("d", self.D)
     self.d__sum = histogram_summary("d_", self.D_)
-    self.inputs_sum = image_summary("inputs", inputs, max_outputs=10)
-    self.G_sum = image_summary("G", self.G, max_outputs=10)
+    self.inputs_sum = image_summary("inputs", inputs)
+    self.G_sum = image_summary("G", self.G)
 
     def sigmoid_cross_entropy_with_logits(x, y):
         return tf.nn.sigmoid_cross_entropy_with_logits(logits=x, labels=y)
@@ -128,7 +130,7 @@ class DCGAN(object):
     self.g_loss_gan = tf.reduce_mean(
       sigmoid_cross_entropy_with_logits(self.D_logits_, tf.ones_like(self.D_)))
 
-    self.feature_matching_loss = tf.losses.mean_squared_error(self.h3_real, self.h3_fake)
+    self.feature_matching_loss = tf.nn.l2_loss(self.h3_real - self.h3_fake)
     self.fm_loss_sum = scalar_summary("feature_matching_loss", self.feature_matching_loss)
 
     self.d_loss_real_sum = scalar_summary("d_loss_real", self.d_loss_real)
@@ -184,6 +186,7 @@ class DCGAN(object):
     self.writer = SummaryWriter(os.path.join("./logs",
         '{0}_{1}'.format(config.dataset, config.exp_name)), self.sess.graph)
 
+    #TODO(phucng): np.random.normal(0, 1, size=(self.sample_num self.z_dim))
     sample_z = np.random.uniform(-1, 1, size=(self.sample_num , self.z_dim))
 
     if config.dataset == 'mnist':
@@ -325,7 +328,7 @@ class DCGAN(object):
                     epoch, idx))
           print("[Sample] d_loss: %.8f, g_loss: %.8f" % (d_loss, g_loss))
 
-        if np.mod(counter, 200)==2:
+        if np.mod(counter, 200) == 2:
           ckp_dir = os.path.join(config.checkpoint_dir, config.exp_name)
           self.save(ckp_dir, counter)
 
