@@ -6,6 +6,7 @@ import json
 import os
 import math
 import numpy as np
+import pdb
 import pprint
 import random
 import scipy.misc
@@ -40,6 +41,15 @@ def load_labels(labels_dict, filenames, label_set_size):
         labels = np.array(labels_dict[fn])-1
         for l in labels:
             embedding[index][l] = 1
+    return embedding
+
+def load_labels_tf_format(labels_dict, filenames, label_set_size):
+    fns = map(lambda x: os.path.splitext(os.path.split(x)[1])[0], filenames)
+    embedding = -1*np.ones([len(filenames), label_set_size], dtype=np.int64)
+    for index, fn in enumerate(fns):
+        labels = np.array(labels_dict[fn])-1
+        for l in labels:
+            embedding[index][l] = l
     return embedding
 
 def load_label_dict(data_dir, mode):

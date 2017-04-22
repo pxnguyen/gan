@@ -3,6 +3,7 @@ import math
 import numpy as np
 import os
 import pdb
+import socket
 import tensorflow as tf
 import time
 
@@ -10,8 +11,7 @@ from six.moves import xrange
 from glob import glob
 from ops import *
 from utils import *
-from tensorflow.contrib.metrics import streaming_precision_at_thresholds
-import socket
+from tensorflow.contrib import metrics
 
 def conv_out_size_same(size, stride):
   return int(math.ceil(float(size) / float(stride)))
@@ -266,32 +266,29 @@ class DCGAN(object):
               .astype(np.float32)
 
         if config.dataset == 'nuswide':
+          data_dict = {
+            self.inputs: batch_images,
+            self.z: batch_z,
+            self.y:batch_labels,
+          }
           # Update D network
-          _, summary_str = self.sess.run([d_optim, self.d_sum],
-            feed_dict={ 
-              self.inputs: batch_images,
-              self.z: batch_z,
-              self.y:batch_labels,
-            })
-          self.writer.add_summary(summary_str, counter)
+          self.sess.run([d_optim], feed_dict=data_dict)
 
           # Update G network
-          _, summary_str = self.sess.run([g_optim, self.g_sum],
-            feed_dict={
-              self.z: batch_z,
-              self.y: batch_labels,
-              self.inputs: batch_images,
-            })
-          self.writer.add_summary(summary_str, counter)
+          self.sess.run([g_optim], feed_dict=data_dict)
+
+          #self.writer.add_summary(summary_str, counter)
 
           # Run g_optim twice to make sure that d_loss does not go to zero (different from paper)
-          _, summary_str = self.sess.run([g_optim, self.g_sum],
-            feed_dict={
-              self.z: batch_z,
-              self.y:batch_labels,
-              self.inputs: batch_images,
-              })
-          self.writer.add_summary(summary_str, counter)
+          self.sess.run([g_optim], feed_dict=data_dict)
+          #self.writer.add_summary(summary_str, counter)
+
+          if np.mod(counter, 50) == 10:
+            summary_str = self.sess.run(self.d_sum, feed_dict=data_dict)
+            self.writer.add_summary(summary_str, counter)
+
+            summary_str = self.sess.run(self.g_sum, feed_dict=data_dict)
+            self.writer.add_summary(summary_str, counter)
 
           errD_fake = self.d_loss_fake.eval({
               self.z: batch_z,
@@ -337,6 +334,7 @@ class DCGAN(object):
     label_dict = load_label_dict(config.data_dir, 'eval')
     data_X = glob(os.path.join(config.data_dir, "eval", self.input_fname_pattern))
     data_y = load_labels(label_dict, data_X, 14)
+    data_y_tf_format = load_labels_tf_format(label_dict, data_X, 14)
 
     self.writer = SummaryWriter(os.path.join("./logs",
         '{0}_{1}_eval'.format(config.dataset, config.exp_name)), self.sess.graph)
@@ -344,15 +342,28 @@ class DCGAN(object):
     batch_idxs = min(len(data_X), config.train_size) // config.batch_size
     _, _, cat_scores, _ = self.discriminator(self.inputs, reuse=True)
     cat_logits = tf.nn.sigmoid(cat_scores)
-    precision, update_op = streaming_precision_at_thresholds(cat_logits, self.y, [0.2])
-    prec_sum = scalar_summary("precision", precision[0])
+    self.labels_tf_format = tf.placeholder(tf.int64, [self.batch_size, self.y_dim], name='y_tfformat')
 
-    tf.global_variables_initializer().run()
-    tf.local_variables_initializer().run()
+    prec_at_t, prec_t_update_op = metrics.streaming_precision_at_thresholds(cat_logits, self.y, [0.2])
+    prec_at_k, prec_k_update_op = metrics.streaming_sparse_precision_at_k(cat_logits,
+            self.labels_tf_format, 5)
+    recall_at_k, recall_k_update_op = metrics.streaming_sparse_recall_at_k(cat_logits,
+            self.labels_tf_format, 5)
+
+    names = ["precision@0.2", "precision@5", "recall@5"]
+    update_ops = [prec_t_update_op, prec_k_update_op, recall_k_update_op]
+
+    prec_t_sum = scalar_summary("precision@0.2", prec_at_t[0])
+    prec_k_sum = scalar_summary("precision@5", prec_at_k)
+    recall_k_sum = scalar_summary("recall@5", recall_at_k)
+
+    metrics_sum = merge_summary([prec_t_sum, prec_k_sum, recall_k_sum])
 
     done = False
     last_counter = -1
     while not done:
+      tf.global_variables_initializer().run()
+      tf.local_variables_initializer().run()
       ckp_dir = os.path.join(config.checkpoint_dir, config.exp_name)
       could_load, checkpoint_counter = self.load(ckp_dir)
 
@@ -381,12 +392,19 @@ class DCGAN(object):
 
         batch_images = np.array(batch).astype(np.float32)
         batch_labels = data_y[idx*config.batch_size:(idx+1)*config.batch_size]
+        batch_lbls_tf = data_y_tf_format[idx*config.batch_size:(idx+1)*config.batch_size]
 
-        precision_value, probs = self.sess.run([update_op, cat_logits], feed_dict={
-          self.inputs: batch_images, self.y: batch_labels})
+        values = self.sess.run(update_ops, feed_dict={
+          self.inputs: batch_images, self.y: batch_labels,
+          self.labels_tf_format: batch_lbls_tf})
+        values[0] = values[0][0]
 
-        print 'Eval checkpoint %d [%4d/%4d] prec: %0.4f' % (counter, idx, batch_idxs, precision_value)
-      summary_str, precision_value = self.sess.run([prec_sum, precision])
+        values_str = map(lambda v: "%0.4f" % v, values)
+        metrics_str = [val for pair in zip(names, values_str) for val in pair]
+        metrics_str = " ".join(metrics_str)
+
+        print 'Eval checkpoint %d [%4d/%4d] %s' % (counter, idx, batch_idxs, metrics_str)
+      summary_str = self.sess.run(metrics_sum)
       self.writer.add_summary(summary_str, counter)
 
   def discriminator(self, image, y=None, reuse=False):
