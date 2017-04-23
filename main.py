@@ -25,7 +25,8 @@ flags.DEFINE_string("input_fname_pattern", "*.jpg", "Glob pattern of filename of
 flags.DEFINE_string("checkpoint_dir", "checkpoint", "Directory name to save the checkpoints [checkpoint]")
 flags.DEFINE_string("sample_dir", "samples", "Directory name to save the image samples [samples]")
 flags.DEFINE_string("exp_name", 'basic', "Experiment name [basic]")
-flags.DEFINE_string("version", 'fm1.0', "Software version")
+flags.DEFINE_string("version",
+        'feature_matching', "Architecture choices [feature_matching, basic, supervised]")
 flags.DEFINE_string("data_dir", '/mnt/hermes/nguyenpx/nuswide', "Path to the data directories")
 flags.DEFINE_boolean("is_train", False, "True for training, False for testing [False]")
 flags.DEFINE_boolean("is_crop", False, "True for training, False for testing [False]")
