@@ -113,15 +113,20 @@ class DCGAN(object):
     def sigmoid_cross_entropy_with_logits(x, y):
         return tf.nn.sigmoid_cross_entropy_with_logits(logits=x, labels=y)
 
+    #self.category_loss_real = tf.reduce_mean(
+    #    tf.nn.sigmoid_cross_entropy_with_logits(
+    #      logits=self.real_cat_logits,
+    #      labels=self.y))
     self.category_loss_real = tf.reduce_mean(
-        tf.nn.sigmoid_cross_entropy_with_logits(
-          logits=self.real_cat_logits,
-          labels=self.y))
+      sigmoid_cross_entropy_with_logits(self.real_cat_logits, self.y))
 
     self.category_loss_fake = tf.reduce_mean(
         tf.nn.sigmoid_cross_entropy_with_logits(
           logits=self.fake_cat_logits,
           labels=self.y))
+
+    self.category_loss_real = tf.Print(self.category_loss_real,
+            [self.y, self.real_cat_logits, self.category_loss_real], summarize=10)
 
     self.d_loss_real = tf.reduce_mean(
       sigmoid_cross_entropy_with_logits(self.D_logits, 0.9*tf.ones_like(self.D)))
@@ -138,8 +143,10 @@ class DCGAN(object):
     self.category_loss_real_sum = scalar_summary("category_loss_real", self.category_loss_real)
     self.category_loss_fake_sum = scalar_summary("category_loss_fake", self.category_loss_fake)
 
-    self.d_loss = self.d_loss_real + self.d_loss_fake\
-        + self.category_loss_real
+    #self.d_loss = self.d_loss_real + self.d_loss_fake\
+    #    + self.category_loss_real
+
+    self.d_loss = self.category_loss_real
 
     if self.version == 'fm1.0':
       self.g_loss = self.feature_matching_loss + self.category_loss_fake
@@ -153,6 +160,8 @@ class DCGAN(object):
 
     self.d_vars = [var for var in t_vars if 'd_' in var.name]
     self.g_vars = [var for var in t_vars if 'g_' in var.name]
+
+    #var_23 = [v for v in tf.global_variables() if v.name == "Variable_23:0"][0]
 
     self.saver = tf.train.Saver()
 
@@ -215,7 +224,7 @@ class DCGAN(object):
                     is_crop=self.is_crop,
                     is_grayscale=self.is_grayscale) for sample_file in sample_files]
       sample_inputs = np.array(sample).astype(np.float32)
-  
+
     counter = 1
     start_time = time.time()
     ckp_dir = os.path.join(config.checkpoint_dir, config.exp_name)
@@ -275,15 +284,15 @@ class DCGAN(object):
           self.sess.run([d_optim], feed_dict=data_dict)
 
           # Update G network
-          self.sess.run([g_optim], feed_dict=data_dict)
+          #self.sess.run([g_optim], feed_dict=data_dict)
 
           #self.writer.add_summary(summary_str, counter)
 
           # Run g_optim twice to make sure that d_loss does not go to zero (different from paper)
-          self.sess.run([g_optim], feed_dict=data_dict)
+          #self.sess.run([g_optim], feed_dict=data_dict)
           #self.writer.add_summary(summary_str, counter)
 
-          if np.mod(counter, 50) == 10:
+          if np.mod(counter, 20) == 10:
             summary_str = self.sess.run(self.d_sum, feed_dict=data_dict)
             self.writer.add_summary(summary_str, counter)
 

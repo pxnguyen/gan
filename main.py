@@ -3,6 +3,7 @@ import scipy.misc
 import numpy as np
 
 from model import DCGAN
+from supervised import FullySupervised
 from utils import pp, visualize, to_json, show_all_variables
 import socket
 
@@ -53,36 +54,48 @@ def main(_):
   run_config.gpu_options.allow_growth=True
 
   with tf.Session(config=run_config) as sess:
-    if FLAGS.dataset == 'nuswide':
-      dcgan = DCGAN(
-          sess,
-          input_width=FLAGS.input_width,
-          input_height=FLAGS.input_height,
-          output_width=FLAGS.output_width,
-          output_height=FLAGS.output_height,
-          batch_size=FLAGS.batch_size,
-          sample_num=FLAGS.batch_size,
-          y_dim=14,
-          c_dim=3,
-          dataset_name=FLAGS.dataset,
-          exp_name=FLAGS.exp_name,
-          input_fname_pattern=FLAGS.input_fname_pattern,
-          is_crop=FLAGS.is_crop,
-          checkpoint_dir=FLAGS.checkpoint_dir,
-          sample_dir=FLAGS.sample_dir,
-	  version=FLAGS.version)
+    if FLAGS.version == 'supervised':
+      model = FullySupervised(
+        sess,
+        input_width=FLAGS.input_width,
+        input_height=FLAGS.input_height,
+        output_width=FLAGS.output_width,
+        output_height=FLAGS.output_height,
+        batch_size=FLAGS.batch_size,
+        sample_num=FLAGS.batch_size,
+        y_dim=14,
+        c_dim=3,
+        dataset_name=FLAGS.dataset,
+        exp_name=FLAGS.exp_name,
+        input_fname_pattern=FLAGS.input_fname_pattern,
+        is_crop=FLAGS.is_crop,
+        checkpoint_dir=FLAGS.checkpoint_dir,
+        sample_dir=FLAGS.sample_dir,
+        version=FLAGS.version)
+    else:
+      model = DCGAN(
+        sess,
+        input_width=FLAGS.input_width,
+        input_height=FLAGS.input_height,
+        output_width=FLAGS.output_width,
+        output_height=FLAGS.output_height,
+        batch_size=FLAGS.batch_size,
+        sample_num=FLAGS.batch_size,
+        y_dim=14,
+        c_dim=3,
+        dataset_name=FLAGS.dataset,
+        exp_name=FLAGS.exp_name,
+        input_fname_pattern=FLAGS.input_fname_pattern,
+        is_crop=FLAGS.is_crop,
+        checkpoint_dir=FLAGS.checkpoint_dir,
+        sample_dir=FLAGS.sample_dir,
+        version=FLAGS.version)
 
     show_all_variables()
     if FLAGS.is_train:
-      dcgan.train(FLAGS)
+      model.train(FLAGS)
     else:
-      #if not dcgan.load(FLAGS.checkpoint_dir):
-      #  raise Exception("[!] Train a model first, then run test mode")
-      dcgan.eval(FLAGS)
-
-    # Below is codes for visualization
-    #OPTION = 1
-    #visualize(sess, dcgan, FLAGS, OPTION)
+      model.eval(FLAGS)
 
 if __name__ == '__main__':
   tf.app.run()
