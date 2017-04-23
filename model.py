@@ -225,7 +225,6 @@ class DCGAN(object):
 
         batch_images = np.array(batch).astype(np.float32)
         batch_labels = data_y[indeces]
-        #batch_labels = data_y[idx*config.batch_size:(idx+1)*config.batch_size]
 
         batch_z = np.random.normal(0, 10, size=(config.batch_size, self.z_dim))
 
