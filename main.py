@@ -35,6 +35,10 @@ flags.DEFINE_boolean("visualize", False, "True for visualizing, False for nothin
 flags.DEFINE_boolean("use_unlabel", False, "Semisupervised learning[False]")
 FLAGS = flags.FLAGS
 
+version_list = ['basic', 'feature_matching', 'supervised']
+if FLAGS.version not in version_list:
+    raise Exception('Wrong version.')
+
 def main(_):
   pp.pprint(flags.FLAGS.__flags)
 
