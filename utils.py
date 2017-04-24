@@ -27,7 +27,11 @@ def show_all_variables():
 def get_image(image_path, input_height, input_width,
               resize_height=64, resize_width=64,
               is_crop=True, is_grayscale=False):
-  image = imread(image_path, is_grayscale)
+  try:
+    image = imread(image_path, is_grayscale)
+  except Error as E:
+    print E
+
   return transform(image, input_height, input_width,
                    resize_height, resize_width, is_crop)
 

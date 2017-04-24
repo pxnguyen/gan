@@ -88,18 +88,23 @@ class DCGAN(object):
 
     self.inputs = tf.placeholder(
       tf.float32, [self.batch_size] + image_dims, name='real_images')
+
     self.sample_inputs = tf.placeholder(
       tf.float32, [self.sample_num] + image_dims, name='sample_inputs')
 
-    inputs = self.inputs
+    inputs_noise = tf.random_normal(tf.shape(self.inputs), mean=0, stddev=0)
+    self.inputs = self.inputs + inputs_noise
     sample_inputs = self.sample_inputs
 
     self.z = tf.placeholder(
       tf.float32, [None, self.z_dim], name='z')
     self.z_sum = histogram_summary("z", self.z)
     self.G = self.generator(self.z, self.y)
-    self.D, self.D_logits, self.real_cat_logits, self.h3_real = self.discriminator(inputs, self.y, reuse=False)
+    self.D, self.D_logits, self.real_cat_logits, self.h3_real = self.discriminator(self.inputs, self.y, reuse=False)
     self.h3_real = tf.reduce_mean(self.h3_real, axis=0)
+
+    #self.D_unlabel, self.D_unlabel_logits, _, self.h3_unlabel_real =\
+    #        self.discriminator(self.unlabeled_inputs, reuse=False)
 
     self.sampler = self.sampler(self.z, self.y)
     self.D_, self.D_logits_, self.fake_cat_logits, self.h3_fake = self.discriminator(self.G, self.y, reuse=True)
@@ -107,7 +112,7 @@ class DCGAN(object):
 
     self.d_sum = histogram_summary("d", self.D)
     self.d__sum = histogram_summary("d_", self.D_)
-    self.inputs_sum = image_summary("inputs", inputs)
+    self.inputs_sum = image_summary("inputs", self.inputs)
     self.G_sum = image_summary("G", self.G)
 
     def sigmoid_cross_entropy_with_logits(x, y):
@@ -155,10 +160,12 @@ class DCGAN(object):
 
   def train(self, config):
     """Train DCGAN"""
-    if config.dataset == 'nuswide':
-      label_dict = load_label_dict(config.data_dir, 'train')
-      data_X = glob(os.path.join(config.data_dir, "train", self.input_fname_pattern))
-      data_y = load_labels(label_dict, data_X, 14)
+    dataset_dir = os.path.join(config.data_dir, config.dataset)
+    label_dict = load_label_dict(dataset_dir, 'train')
+    data_X = glob(os.path.join(dataset_dir, "train", self.input_fname_pattern))
+    unlabel_data = glob(os.path.join(dataset_dir,
+      "nolabel", self.input_fname_pattern))
+    data_y = load_labels(label_dict, data_X, self.y_dim)
     #np.random.shuffle(data)
 
     d_optim = tf.train.AdamOptimizer(config.learning_rate, beta1=config.beta1) \
@@ -182,18 +189,17 @@ class DCGAN(object):
     sample_z = np.random.normal(0, 10, size=(self.sample_num, self.z_dim))
     #sample_z = np.random.uniform(-1, 1, size=(self.sample_num , self.z_dim))
 
-    if config.dataset == 'nuswide':
-      sample_files = data_X[0:self.sample_num]
-      sample = [
-          get_image(sample_file,
-                    input_height=self.input_height,
-                    input_width=self.input_width,
-                    resize_height=self.output_height,
-                    resize_width=self.output_width,
-                    is_crop=self.is_crop,
-                    is_grayscale=self.is_grayscale) for sample_file in sample_files]
-      sample_inputs = np.array(sample).astype(np.float32)
-      sample_labels = data_y[0:self.sample_num]
+    sample_files = data_X[0:self.sample_num]
+    sample = [
+        get_image(sample_file,
+                  input_height=self.input_height,
+                  input_width=self.input_width,
+                  resize_height=self.output_height,
+                  resize_width=self.output_width,
+                  is_crop=self.is_crop,
+                  is_grayscale=self.is_grayscale) for sample_file in sample_files]
+    sample_inputs = np.array(sample).astype(np.float32)
+    sample_labels = data_y[0:self.sample_num]
 
     counter = 1
     start_time = time.time()
@@ -206,14 +212,22 @@ class DCGAN(object):
       print(" [!] Load failed...")
 
     population = range(len(data_X))
+    unlabel_pop = range(len(unlabel_data))
     for epoch in xrange(config.epoch):
-      if config.dataset == 'nuswide':
-        batch_idxs = min(len(data_X), config.train_size) // config.batch_size
+      batch_idxs = min(len(data_X), config.train_size) // config.batch_size
 
       for idx in xrange(0, batch_idxs):
-        indeces = random.sample(population, config.batch_size)
+        indeces = random.sample(population, int(config.batch_size/2))
+        unlbl_indeces = random.sample(unlabel_pop, int(config.batch_size/2))
         batch_files = [data_X[i] for i in indeces]
-        #batch_files = data_X[idx*config.batch_size:(idx+1)*config.batch_size]
+        batch_labels = data_y[indeces]
+        unlbl_batch_files = [unlabel_data[i] for i in unlbl_indeces]
+        unlabel_lbls = np.zeros([int(config.batch_size/2), self.y_dim])
+
+        if config.use_unlabel:
+          batch_labels = np.concatenate([batch_labels, unlabel_lbls], axis=0)
+          batch_files = batch_files + unlbl_batch_files
+
         batch = [
             get_image(batch_file,
                       input_height=self.input_height,
@@ -224,41 +238,39 @@ class DCGAN(object):
                       is_grayscale=False) for batch_file in batch_files]
 
         batch_images = np.array(batch).astype(np.float32)
-        batch_labels = data_y[indeces]
 
         batch_z = np.random.normal(0, 10, size=(config.batch_size, self.z_dim))
 
-        if config.dataset == 'nuswide':
-          data_dict = {
-            self.inputs: batch_images,
-            self.z: batch_z,
-            self.y:batch_labels,
-          }
-          # Update D network
-          self.sess.run([d_optim], feed_dict=data_dict)
+        data_dict = {
+          self.inputs: batch_images,
+          self.z: batch_z,
+          self.y:batch_labels,
+        }
+        # Update D network
+        self.sess.run([d_optim], feed_dict=data_dict)
 
-          # Update G network
-          self.sess.run([g_optim], feed_dict=data_dict)
-          self.sess.run([g_optim], feed_dict=data_dict)
-          #self.writer.add_summary(summary_str, counter)
+        # Update G network
+        self.sess.run([g_optim], feed_dict=data_dict)
+        self.sess.run([g_optim], feed_dict=data_dict)
+        #self.writer.add_summary(summary_str, counter)
 
-          if np.mod(counter, 20) == 10:
-            summary_str = self.sess.run(self.d_sum, feed_dict=data_dict)
-            self.writer.add_summary(summary_str, counter)
+        if np.mod(counter, 20) == 10:
+          summary_str = self.sess.run(self.d_sum, feed_dict=data_dict)
+          self.writer.add_summary(summary_str, counter)
 
-            summary_str = self.sess.run(self.g_sum, feed_dict=data_dict)
-            self.writer.add_summary(summary_str, counter)
+          summary_str = self.sess.run(self.g_sum, feed_dict=data_dict)
+          self.writer.add_summary(summary_str, counter)
 
-          errD_fake = self.d_loss_fake.eval({
-              self.z: batch_z, self.y:batch_labels
-          })
-          errD_real = self.d_loss_real.eval({
-              self.inputs: batch_images, self.y:batch_labels
-          })
-          errG = self.g_loss.eval({
-              self.z: batch_z, self.inputs: batch_images,
-              self.y: batch_labels
-          })
+        errD_fake = self.d_loss_fake.eval({
+            self.z: batch_z, self.y:batch_labels
+        })
+        errD_real = self.d_loss_real.eval({
+            self.inputs: batch_images, self.y:batch_labels
+        })
+        errG = self.g_loss.eval({
+            self.z: batch_z, self.inputs: batch_images,
+            self.y: batch_labels
+        })
 
         counter += 1
         print("Epoch: [%2d] [%4d/%4d] time: %4.4f, d_loss: %.8f, g_loss: %.8f" \
@@ -289,8 +301,8 @@ class DCGAN(object):
     """Eval DCGAN"""
     label_dict = load_label_dict(config.data_dir, 'eval')
     data_X = glob(os.path.join(config.data_dir, "eval", self.input_fname_pattern))
-    data_y = load_labels(label_dict, data_X, 14)
-    data_y_tf_format = load_labels_tf_format(label_dict, data_X, 14)
+    data_y = load_labels(label_dict, data_X, self.y_dim)
+    data_y_tf_format = load_labels_tf_format(label_dict, data_X, self.y_dim)
 
     self.writer = SummaryWriter(os.path.join("./logs",
         '{0}_{1}_eval'.format(config.dataset, config.exp_name)), self.sess.graph)
