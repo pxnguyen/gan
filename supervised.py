@@ -185,8 +185,9 @@ class FullySupervised(object):
 
   def eval(self, config):
     """Eval DCGAN"""
-    label_dict = load_label_dict(config.data_dir, 'eval')
-    data_X = glob(os.path.join(config.data_dir, "eval", self.input_fname_pattern))
+    dataset_dir = os.path.join(config.data_dir, config.dataset)
+    label_dict = load_label_dict(dataset_dir, 'eval')
+    data_X = glob(os.path.join(dataset_dir, "eval", self.input_fname_pattern))
     data_y = load_labels(label_dict, data_X, 14)
     data_y_tf_format = load_labels_tf_format(label_dict, data_X, 14)
 
@@ -200,16 +201,16 @@ class FullySupervised(object):
 
     prec_at_t, prec_t_update_op = metrics.streaming_precision_at_thresholds(cat_logits, self.y, [0.2])
     prec_at_k, prec_k_update_op = metrics.streaming_sparse_precision_at_k(cat_logits,
-            self.labels_tf_format, 5)
+            self.labels_tf_format, 1)
     recall_at_k, recall_k_update_op = metrics.streaming_sparse_recall_at_k(cat_logits,
-            self.labels_tf_format, 5)
+            self.labels_tf_format, 1)
 
-    names = ["precision@0.2", "precision@5", "recall@5"]
+    names = ["precision@0.2", "precision@1", "recall@1"]
     update_ops = [prec_t_update_op, prec_k_update_op, recall_k_update_op]
 
     prec_t_sum = scalar_summary("precision@0.2", prec_at_t[0])
-    prec_k_sum = scalar_summary("precision@5", prec_at_k)
-    recall_k_sum = scalar_summary("recall@5", recall_at_k)
+    prec_k_sum = scalar_summary("precision@1", prec_at_k)
+    recall_k_sum = scalar_summary("recall@1", recall_at_k)
 
     metrics_sum = merge_summary([prec_t_sum, prec_k_sum, recall_k_sum])
 
