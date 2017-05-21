@@ -126,13 +126,17 @@ class CPrimal(object):
     layer_real = tf.reshape(layer_real, [10, -1])
     #h3_real = tf.reshape(h3_real, [1, -1])
 
-    self.sampler = self.sampler(self.z, self.y)
     h1f, h2f, fc1f, fc2f =\
         self.discriminator(self.G, self.y, reuse=True)
     layer_fake = h2f
     layer_fake = tf.reshape(layer_fake, [10, bs_per_tag, 4, 4, self.df_dim*4])
     layer_fake = tf.reduce_mean(layer_fake, axis=1)
     layer_fake = tf.reshape(layer_fake, [10, -1])
+
+    self.samples = self.sampler(self.z, self.y)
+    pdb.set_trace()
+    _, _, _, self.fc2s =\
+        self.discriminator(self.samples, self.y, reuse=True)
 
     self.c_loss_real = tf.reduce_mean(
         tf.nn.softmax_cross_entropy_with_logits(
@@ -299,7 +303,7 @@ class CPrimal(object):
           sample_labels = np.zeros((self.sample_num, self.y_dim)).astype(np.float32)
           sample_labels[np.arange(self.sample_num), np.divide(np.arange(self.sample_num), 10)] = 1
           samples = self.sess.run(
-            self.sampler,
+            self.samples,
             feed_dict={
                 self.z: sample_z,
                 self.y:sample_labels,
@@ -322,7 +326,7 @@ class CPrimal(object):
           ckp_dir = os.path.join(config.checkpoint_dir, config.exp_name)
           self.save(ckp_dir, counter)
 
-        if np.mod(counter, 10) == 2: # eval
+        if np.mod(counter, 1000) == 2: # eval
             self.eval(eval_generator, counter)
 
   def eval(self, generator, counter):
@@ -355,6 +359,32 @@ class CPrimal(object):
     summary_str = self.sess.run(self.metrics_sum)
     self.writer.add_summary(summary_str, counter)
 
+  def visualize(self, config):
+    ckp_dir = os.path.join(config.checkpoint_dir, config.exp_name)
+    could_load, counter = self.load(ckp_dir)
+    pdb.set_trace()
+    sample_z = np.random.normal(0, 1, size=(600, self.z_dim))
+
+    c_loss_sample = tf.reduce_mean(
+        tf.nn.softmax_cross_entropy_with_logits(
+          logits=self.fc2s, labels=self.y))
+
+    for lbl in range(10):
+      sample_lbls = np.zeros([600, config.y_dim])
+      sample_lbls[np.arange(600), lbl] = 1
+      samples, fc2f, fake_loss = self.sess.run(
+          [self.samples, self.fc2s, c_loss_sample],
+          feed_dict={
+            self.z: sample_z,
+            self.y: sample_lbls,
+          }
+      )
+      pdb.set_trace()
+      manifold_h = int(np.ceil(np.sqrt(samples.shape[0])))
+      manifold_w = int(np.floor(np.sqrt(samples.shape[0])))
+      save_images(samples, [manifold_h, manifold_w],
+          './{}/{}/vis/visualize_{:02d}_c{}.png'.format(config.sample_dir,
+            config.exp_name, counter, lbl))
 
   def discriminator(self, image, y=None, reuse=False):
     with tf.variable_scope("discriminator") as scope:
@@ -372,6 +402,7 @@ class CPrimal(object):
 
       fc1 = linear(tf.reshape(h2, [self.batch_size, -1]), 1, 'd_fc1_lin')
       fc2 = linear(tf.reshape(h2, [self.batch_size, -1]), self.y_dim, 'fc2_lin')
+      pdb.set_trace()
 
       return h1, h2, fc1, fc2
 

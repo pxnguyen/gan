@@ -9,6 +9,7 @@ from primal import Primal
 from cprimal import CPrimal
 from dual import Dual
 from utils import pp, visualize, to_json, show_all_variables
+import pdb
 import socket
 
 import tensorflow as tf
@@ -31,13 +32,13 @@ flags.DEFINE_string("checkpoint_dir", "checkpoint", "Directory name to save the 
 flags.DEFINE_string("sample_dir", "samples", "Directory name to save the image samples [samples]")
 flags.DEFINE_string("exp_name", 'basic', "Experiment name [basic]")
 flags.DEFINE_string("norm", 'l1', "Experiment name [basic]")
+flags.DEFINE_string("train_mode", 'all', "True for training with labels, False for not [False]")
 flags.DEFINE_string("version",
         'feature_matching', "Architecture choices [feature_matching, basic, supervised]")
 flags.DEFINE_string("data_dir", '/mnt/hermes/nguyenpx/', "Path to the data directories")
 flags.DEFINE_boolean("is_train", False, "True for training, False for testing [False]")
 flags.DEFINE_boolean("is_crop", False, "True for training, False for testing [False]")
 flags.DEFINE_boolean("visualize", False, "True for visualizing, False for nothing [False]")
-flags.DEFINE_boolean("with_label_loss", False, "True for training with labels, False for not [False]")
 FLAGS = flags.FLAGS
 
 version_list = ['basic', 'feature_matching', 'supervised',
@@ -63,6 +64,10 @@ def main(_):
   sample_dir = os.path.join(FLAGS.sample_dir, FLAGS.exp_name)
   if not os.path.exists(sample_dir):
     os.makedirs(sample_dir)
+
+  vis_dir = os.path.join(FLAGS.sample_dir, FLAGS.exp_name, 'vis')
+  if not os.path.exists(vis_dir):
+    os.makedirs(vis_dir)
 
   #gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.333)
   run_config = tf.ConfigProto()
@@ -115,7 +120,7 @@ def main(_):
         batch_size=FLAGS.batch_size,
         sample_num=100,
         y_dim=FLAGS.y_dim,
-        with_label_loss=FLAGS.with_label_loss,
+        train_mode=FLAGS.train_mode,
         c_dim=3,
         dataset_name=FLAGS.dataset,
         exp_name=FLAGS.exp_name,
@@ -132,9 +137,9 @@ def main(_):
         output_width=FLAGS.output_width,
         output_height=FLAGS.output_height,
         batch_size=FLAGS.batch_size,
-        sample_num=100,
+        sample_num=FLAGS.batch_size,
         y_dim=FLAGS.y_dim,
-        with_label_loss=FLAGS.with_label_loss,
+        train_mode=FLAGS.train_mode,
         c_dim=3,
         dataset_name=FLAGS.dataset,
         exp_name=FLAGS.exp_name,
@@ -206,8 +211,6 @@ def main(_):
     if FLAGS.is_train:
       model.train(FLAGS)
     elif FLAGS.visualize:
-      #ckp_dir = os.path.join(FLAGS.checkpoint_dir, FLAGS.exp_name)
-      #model.load(ckp_dir)
       model.visualize(FLAGS)
     else:
       model.eval(FLAGS)
