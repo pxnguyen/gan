@@ -25,7 +25,8 @@ class Primal(object):
          batch_size=64, sample_num=64, output_height=64, output_width=64,
          y_dim=None, z_dim=100, gf_dim=64, df_dim=48, version='basic',
          gfc_dim=1024, dfc_dim=1024, c_dim=3, dataset_name='default',
-         train_mode='all', input_fname_pattern='*.jpg', checkpoint_dir=None,
+         disc_name='dcgan', gen_name='dcgan', train_mode='all',
+         input_fname_pattern='*.jpg', checkpoint_dir=None,
          exp_name='basic', sample_dir=None):
     """
 
@@ -82,22 +83,38 @@ class Primal(object):
     self.version = version
     self.LAMBDA = 10
     self.train_mode = train_mode
-    self.generator = self.make_generator()
-    self.sampler = self.make_sampler()
-    self.discriminator = self.make_discriminator()
+    self.generator = self.make_generator(gen_name)
+    self.sampler = self.make_sampler(gen_name)
+    self.discriminator = self.make_discriminator(disc_name)
 
     self.build_model()
 
-  def make_generator(self):
-    func = lambda z,y: generator.generator_cifar(self, z, y)
+  def make_generator(self, gen_name):
+    if gen_name == 'lsgan':
+      func = lambda z, y: generator.generator_lsgan(self, z, y)
+    elif gen_name == 'dcgan':
+      func = lambda z, y: generator.generator_lsgan(self, z, y)
+    else:
+      func = lambda z, y: generator.generator_lsgan(self, z, y)
     return func
 
-  def make_sampler(self):
-    func = lambda z,y: generator.sampler_cifar(self, z, y)
+  def make_sampler(self, gen_name):
+    if gen_name == 'lsgan':
+      func = lambda z, y: generator.sampler_lsgan(self, z, y)
+    elif gen_name == 'dcgan':
+      func = lambda z, y: generator.sampler_cifar(self, z, y)
+    else:
+      func = lambda z, y: generator.sampler_cifar(self, z, y)
     return func
 
-  def make_discriminator(self):
-    func = lambda image, reuse: discriminator.disc_4layer(self, image, reuse)
+  def make_discriminator(self, disc_name):
+    if disc_name == 'lsgan':
+      func = lambda image, reuse: discriminator.disc_lsgan(self, image, reuse)
+    elif disc_name == 'dcgan':
+      func = lambda image, reuse: discriminator.disc_lsgan(self, image, reuse)
+    else:
+      func = lambda image, reuse: discriminator.disc_lsgan(self, image, reuse)
+
     return func
 
 

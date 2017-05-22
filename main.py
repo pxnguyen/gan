@@ -33,6 +33,8 @@ flags.DEFINE_string("sample_dir", "samples", "Directory name to save the image s
 flags.DEFINE_string("exp_name", 'basic', "Experiment name [basic]")
 flags.DEFINE_string("norm", 'l1', "Experiment name [basic]")
 flags.DEFINE_string("train_mode", 'all', "True for training with labels, False for not [False]")
+flags.DEFINE_string("generator", 'lsgan', "True for training with labels, False for not [False]")
+flags.DEFINE_string("discriminator", 'lsgan', "True for training with labels, False for not [False]")
 flags.DEFINE_string("version",
         'feature_matching', "Architecture choices [feature_matching, basic, supervised]")
 flags.DEFINE_string("data_dir", '/mnt/hermes/nguyenpx/', "Path to the data directories")
@@ -119,6 +121,8 @@ def main(_):
         output_height=FLAGS.output_height,
         batch_size=FLAGS.batch_size,
         sample_num=100,
+        gen_name=FLAGS.generator,
+        disc_name=FLAGS.discriminator,
         y_dim=FLAGS.y_dim,
         train_mode=FLAGS.train_mode,
         c_dim=3,

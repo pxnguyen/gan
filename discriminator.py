@@ -39,11 +39,10 @@ def disc_3layer(self, image, reuse=False):
 
     return h1, h2, fc1, fc2
 
-def disc_4layer(self, image, reuse=False):
+def disc_lsgan(self, image, reuse=False):
   with tf.variable_scope("discriminator") as scope:
     if reuse:
       scope.reuse_variables()
-
     h0 = lrelu(conv2d(image, self.df_dim, name='d_h0_conv'))
     h1_1 = lrelu(self.d_bn1_1(
       conv2d(h0, self.df_dim*2, k_h=3, k_w=3,
@@ -59,93 +58,27 @@ def disc_4layer(self, image, reuse=False):
       conv2d(h1_3, self.df_dim*4, k_h=3, k_w=3,
         d_h=1, d_w=1, name='d_h2_1_conv')))
     h2_2 = lrelu(self.d_bn2_2(
-      conv2d(h2_1, self.df_dim*4, k_h=4, k_w=4,
-        d_h=2, d_w=2, name='d_h2_2_conv')))
-
-    h3 = conv2d(h2_2, self.df_dim*8, name='d_h3_conv')
-    h3 = lrelu(self.d_bn3_1(h3))
-
-    fc1 = linear(tf.reshape(h3, [self.batch_size, -1]), 1, 'd_fc1_lin')
-    fc2 = linear(tf.reshape(h3, [self.batch_size, -1]), self.y_dim, 'fc2_lin')
-
-    return h2_2, h3, fc1, fc2
-
-def disc_5layer(self, image, reuse=False):
-  with tf.variable_scope("discriminator") as scope:
-    if reuse:
-      scope.reuse_variables()
-
-    h1_1 = lrelu(self.d_bn1_1(
-      conv2d(image, self.df_dim*2, k_h=4, k_w=4,
-        d_h=1, d_w=1, name='d_h1_1_conv')))
-    h1_2 = lrelu(self.d_bn1_2(
-      conv2d(h1_1, self.df_dim*2, k_h=4, k_w=4,
-        d_h=2, d_w=2, name='d_h1_2_conv')))
-    #16x16
-
-    h2_1 = lrelu(self.d_bn2_1(
-      conv2d(h1_2, self.df_dim*4, k_h=4, k_w=4,
-        d_h=1, d_w=1, name='d_h2_1_conv')))
-    h2_2 = lrelu(self.d_bn2_2(
-      conv2d(h2_1, self.df_dim*4, k_h=4, k_w=4,
-        d_h=2, d_w=2, name='d_h2_2_conv')))
-    #8x8
-
-    h3_1 = lrelu(self.d_bn3_1(
-      conv2d(h2_2, self.df_dim*4, k_h=4, k_w=4,
-        d_h=1, d_w=1, name='d_h3_1_conv')))
-    h3_2 = lrelu(self.d_bn3_2(
-      conv2d(h3_1, self.df_dim*4, k_h=1, k_w=4,
-        d_h=2, d_w=2, name='d_h3_3_conv')))
-    #4x4
-
-    fc1 = linear(tf.reshape(h3_2, [self.batch_size, -1]), 1, 'd_fc1_lin')
-    fc2 = linear(tf.reshape(h3_2, [self.batch_size, -1]), self.y_dim, 'fc2_lin')
-
-    return h2_2, h3_2, fc1, fc2
-
-def disc_lsgan(self, image, reuse=False):
-  with tf.variable_scope("discriminator") as scope:
-    if reuse:
-      scope.reuse_variables()
-
-    h1_1 = lrelu(self.d_bn1_1(
-      conv2d(image, self.df_dim*2, k_h=3,
-        k_w=3, d_h=1, d_w=1, name='d_h1_1_conv')))
-    h1_2 = lrelu(self.d_bn1_1(
-      conv2d(h1_1, self.df_dim*2, k_h=3,
-        k_w=3, d_h=1, d_w=1, name='d_h1_2_conv')))
-    h1_3 = lrelu(self.d_bn1_2(
-      conv2d(h1_2, self.df_dim*2, k_h=4,
-        k_w=4, d_h=2, d_w=2, name='d_h1_3_conv')))
-    #16x16
-
-    h2_1 = lrelu(self.d_bn2_1(
-      conv2d(h1_3, self.df_dim*4, k_h=3, k_w=3,
-        d_h=1, d_w=1, name='d_h2_1_conv')))
-    h2_2 = lrelu(self.d_bn2_1(
       conv2d(h2_1, self.df_dim*4, k_h=3, k_w=3,
         d_h=1, d_w=1, name='d_h2_2_conv')))
-    h2_3 = lrelu(self.d_bn2_2(
+    h2_3 = lrelu(self.d_bn2_3(
       conv2d(h2_2, self.df_dim*4, k_h=4, k_w=4,
         d_h=2, d_w=2, name='d_h2_3_conv')))
-    #8x8
 
     h3_1 = lrelu(self.d_bn3_1(
-      conv2d(h2_3, self.df_dim*4, k_h=3, k_w=3,
+      conv2d(h2_3, self.df_dim*8, k_h=3, k_w=3,
         d_h=1, d_w=1, name='d_h3_1_conv')))
-    h3_2 = lrelu(self.d_bn3_1(
-      conv2d(h3_1, self.df_dim*4, k_h=3, k_w=3,
+    h3_2 = lrelu(self.d_bn3_2(
+      conv2d(h3_1, self.df_dim*8, k_h=3, k_w=3,
         d_h=1, d_w=1, name='d_h3_2_conv')))
-    h3_3 = lrelu(self.d_bn3_2(
-      conv2d(h3_2, self.df_dim*4, k_h=1, k_w=4,
+    h3_3 = lrelu(self.d_bn3_3(
+      conv2d(h3_2, self.df_dim*8, k_h=4, k_w=4,
         d_h=2, d_w=2, name='d_h3_3_conv')))
     #4x4
 
     fc1 = linear(tf.reshape(h3_3, [self.batch_size, -1]), 1, 'd_fc1_lin')
     fc2 = linear(tf.reshape(h3_3, [self.batch_size, -1]), self.y_dim, 'fc2_lin')
 
-    return h2_3, h3_3, fc1, fc2
+    return h2_2, h3_3, fc1, fc2
 
 def disc_began(self, image, reuse=False):
   with tf.variable_scope("discriminator") as scope:

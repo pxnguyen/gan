@@ -17,6 +17,58 @@ from tensorflow.contrib import metrics
 def conv_out_size_same(size, stride):
   return int(math.ceil(float(size) / float(stride)))
 
+def generator_lsgan(self, z, y):
+    with tf.variable_scope("generator") as scope:
+      z = concat([z, y], 1)
+      self.z_, self.h0_w, self.h0_b = linear(
+          z, self.gf_dim*8*4*4, 'g_h0_lin', with_w=True)
+
+      self.h0 = tf.reshape(
+          self.z_, [-1, 4, 4, self.gf_dim * 8])
+      h0 = tf.nn.relu(self.g_bn0(self.h0))
+
+      self.h1, self.h1_w, self.h1_b = deconv2d(
+          h0, [self.batch_size, 8, 8, self.gf_dim*4],
+          name='g_h1', with_w=True)
+      h1 = tf.nn.relu(self.g_bn1(self.h1))
+
+      h2, self.h2_w, self.h2_b = deconv2d(
+          h1, [self.batch_size, 16, 16, self.gf_dim*2],
+          name='g_h2', with_w=True)
+      h2 = tf.nn.relu(self.g_bn2(h2))
+
+      h3, self.h3_w, self.h3_b = deconv2d(
+          h2, [self.batch_size, 32, 32, 3],
+          name='g_h3', with_w=True)
+      h3 = tf.nn.relu(self.g_bn3(h3))
+
+      return tf.nn.tanh(h3)
+
+def sampler_lsgan(self, z, y):
+    with tf.variable_scope("generator") as scope:
+      scope.reuse_variables()
+      z = concat([z, y], 1)
+      self.z_, self.h0_w, self.h0_b = linear(
+          z, self.gf_dim*8*4*4, 'g_h0_lin', with_w=True)
+
+      self.h0 = tf.reshape(
+          self.z_, [-1, 4, 4, self.gf_dim * 8])
+      h0 = tf.nn.relu(self.g_bn0(self.h0))
+
+      h1 = deconv2d(h0, [self.sample_num, 8, 8, self.gf_dim*4],
+          name='g_h1', with_w=False)
+      h1 = tf.nn.relu(self.g_bn1(h1))
+
+      h2 = deconv2d(h1, [self.sample_num, 16, 16, self.gf_dim*2],
+          name='g_h2', with_w=False)
+      h2 = tf.nn.relu(self.g_bn2(h2))
+
+      h3 = deconv2d(h2, [self.sample_num, 32, 32, 3],
+          name='g_h3', with_w=False)
+      h3 = tf.nn.relu(self.g_bn3(h3))
+
+      return tf.nn.tanh(h3)
+
 def generator_began(self, z, y):
     with tf.variable_scope("generator") as scope:
       z = concat([z, y], 1)
